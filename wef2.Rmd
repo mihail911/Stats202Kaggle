@@ -1,0 +1,95 @@
+Getting Started with Kaggle Competition
+========================================================
+
+After downloading the .csv files, we load the data as usual.
+
+```{r}
+# Change this to your data directory
+data.dir <- "~/Dropbox/Stanford 2015-2016 Q1/Stats202/Stats202Kaggle/data"
+setwd(data.dir)
+# Read in each data files into a data frame
+training.target <- read.csv("training_target.csv")
+training.features <- read.csv("training_features.csv")
+validation.features <- read.csv("validation_features.csv")
+validation.target <- read.csv("validation_target.csv")
+leaderboard.features<- read.csv("leaderboard_features.csv")
+```
+
+```{r}
+feature.names <- names(training.features)
+for (feature.name in feature.names[-1]) {# The [-1] serves to exclude the subject id
+    # Give the new dummy variable a meaningful name
+    dummy.name <- paste0("is.na.",feature.name)
+    is.na.feature <- is.na(training.features[,feature.name])
+    # Convert boolean values to binary
+    training.features[is.na.feature,feature.name] <- 
+      mean(training.features[,feature.name], na.rm = TRUE)
+}
+```
+
+```{r}
+for (feature.name in feature.names[-1]) {# The [-1] serves to exclude the subject id
+    # Give the new dummy variable a meaningful name
+    dummy.name <- paste0("is.na.",feature.name)
+    is.na.feature <- is.na(validation.features[,feature.name])
+    # Convert boolean values to binary
+    # validation.features[,dummy.name] <- as.integer(is.na.feature)
+    validation.features[is.na.feature,feature.name] <- 
+      mean(training.features[,feature.name], na.rm = TRUE)
+}
+```
+
+```{r}
+library (gbm)
+num_features = ncol(training.features)-1
+predictor_subset_size = as.integer(sqrt(num_features))
+# result = rfcv(training, training$ALSFRS_slope, cv.fold=5, scale="log", step=0.5,
+  # mtry=function(p) max(1, floor(sqrt(num_features))), recursive=FALSE)
+
+# predictor_subset_sizes = c(predictor_subset_size - 1, predictor_subset_size, predictor_subset_size + 1)
+# predictor_subset_sizes = c(50)
+n.trees = c(100, 200, 500)
+rfs = list()
+training = data.frame(training.target[-1], training.features[-1])
+  for (m in n.trees) {
+    rfs[[m]] = gbm(ALSFRS_slope ~ ., data=training, distribution="gaussian", n.trees = m, interaction.depth = 4, shrinkage = 0.01)
+  }
+
+library("Metrics")
+rf.preds = list()
+test.MSEs = list()
+
+  for (m in n.trees) {
+    rf.preds[[m]] <- predict(rfs[[m]], newdata=validation.features[-1], n.trees=m)
+    test.MSEs[[m]] = rmse(rf.preds[[m]], validation.target$ALSFRS_slope)
+    #test.MSEs[[m]] <- sqrt(mean((rf.preds[[m]] - validation.target$ALSFRS_slope)^2))
+  }
+```
+
+Let's take a look at the format of **training.target** data:
+
+```{r}
+head(training.target)
+```
+
+We also load the **leaderboard_predictions-example.csv** file to see the output format. 
+
+```{r}
+leaderboard.predictions <- read.csv("leaderboard_predictions-example.csv") 
+head(leaderboard.predictions)
+```
+The format matches with the **training.target**. 
+
+Here, for each leaderboard subject, let's predict the target by the mean of the training target.
+
+```{r}
+training_target_mean <- mean(training.target$ALSFRS_slope)
+print(training_target_mean)
+leaderboard.predictions$ALSFRS_slope <- training_target_mean
+```
+
+We use **write.csv** function to write a CSV file in the contest format with the leaderboard subject predictions. 
+
+```{r}
+write.csv(leaderboard.predictions, file = "leaderboard_predictions-boosting.csv",row.names=FALSE)
+```
