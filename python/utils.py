@@ -2,7 +2,7 @@
 """
 
 import csv
-
+import numpy as np
 
 def featurizer(filePath):
     """Returns features for given file."""
@@ -10,7 +10,14 @@ def featurizer(filePath):
     with open(filePath, "r") as f:
         reader = csv.DictReader(f)
         for example in reader:
-            features.append(dict(example.items()))
+            examplesDict = dict(example.items())
+            cleanDict = {}
+            for featureName, featureValue in examplesDict.iteritems():
+                if featureValue == "NA":
+                    cleanDict[featureName] = np.nan
+                else:
+                    cleanDict[featureName] = float(featureValue)
+            features.append(cleanDict)
 
     return features
 
@@ -24,7 +31,7 @@ def getTargets(filePath):
     with open(filePath, "r") as f:
         reader = csv.DictReader(f)
         for example in reader:
-            targets.append(example["ALSFRS_slope"])
+            targets.append(float(example["ALSFRS_slope"]))
 
     return targets
 
